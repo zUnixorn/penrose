@@ -1605,9 +1605,8 @@ impl<X: XConn> WindowManager<X> {
                 error!("Error killing client: {}", e);
             }
 
-            self.conn.flush();
             self.remove_client(id)?;
-            self.apply_layout(self.active_ws_index())?;
+            self.conn.flush();
         }
 
         Ok(())
