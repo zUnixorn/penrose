@@ -1,5 +1,8 @@
 //! Metadata around X clients and manipulating them
-use crate::core::xconnection::Xid;
+use crate::core::{
+    data_types::Region,
+    xconnection::{Atom, Prop, WmHints, XClientProperties, Xid},
+};
 
 /**
  * Meta-data around a client window that we are handling.
@@ -13,31 +16,61 @@ pub struct Client {
     id: Xid,
     wm_name: String,
     wm_class: String,
+    window_type: String,
     workspace: usize,
+    geom: Region,
     // state flags
+    pub(crate) accepts_focus: bool,
     pub(crate) floating: bool,
     pub(crate) fullscreen: bool,
     pub(crate) mapped: bool,
+    pub(crate) urgent: bool,
     pub(crate) wm_managed: bool,
 }
 
 impl Client {
-    /// Track a new client window on a specific workspace
-    pub(crate) fn new(
-        id: Xid,
-        wm_name: String,
-        wm_class: String,
-        workspace: usize,
-        floating: bool,
-    ) -> Client {
-        Client {
+    pub(crate) fn new<X>(conn: &X, id: Xid, workspace: usize, floating_classes: &[&str]) -> Self
+    where
+        X: XClientProperties,
+    {
+        let accepts_focus = match conn.get_prop(id, Atom::WmHints.as_ref()) {
+            Ok(Prop::WmHints(WmHints { accepts_input, .. })) => accepts_input,
+            _ => true,
+        };
+
+        let geom = match conn.get_prop(id, Atom::WmNormalHints.as_ref()) {
+            Ok(Prop::WmNormalHints(nh)) => nh.requested_position(),
+            _ => None,
+        }
+        .or(Some(Region::default()))
+        .unwrap();
+
+        let wm_name = conn.client_name(id).unwrap_or("unknown".into());
+
+        let wm_class = match conn.get_prop(id, Atom::WmClass.as_ref()) {
+            Ok(Prop::UTF8String(strs)) => strs[0].clone(),
+            _ => "".into(),
+        };
+
+        let window_type = match conn.get_prop(id, Atom::NetWmWindowType.as_ref()) {
+            Ok(Prop::UTF8String(strs)) => strs[0].clone(),
+            _ => "".into(),
+        };
+
+        let floating = conn.client_should_float(id, floating_classes);
+
+        Self {
             id,
             wm_name,
             wm_class,
+            window_type,
             workspace,
+            geom,
+            accepts_focus,
             floating,
             fullscreen: false,
             mapped: false,
+            urgent: false,
             wm_managed: true,
         }
     }

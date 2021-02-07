@@ -101,14 +101,14 @@ pub enum WindowState {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct WmHints {
-    flags: WmHintsFlags,
-    accepts_input: bool,
-    initial_state: WindowState,
-    icon_pixmap: u32,
-    icon_win: Xid,
-    icon_position: Point,
-    icon_mask: u32,
-    window_group: u32,
+    pub(crate) flags: WmHintsFlags,
+    pub(crate) accepts_input: bool,
+    pub(crate) initial_state: WindowState,
+    pub(crate) icon_pixmap: u32,
+    pub(crate) icon_win: Xid,
+    pub(crate) icon_position: Point,
+    pub(crate) icon_mask: u32,
+    pub(crate) window_group: u32,
 }
 
 impl WmHints {
@@ -224,6 +224,11 @@ impl WmNormalHints {
             max,
             user_specified,
         }
+    }
+
+    /// The requested position for this client if there is one.
+    pub fn requested_position(&self) -> Option<Region> {
+        self.user_specified.or(self.base).or(self.min).or(self.max)
     }
 
     /// Try to construct a [WmNormalHints] instance from raw bytes.

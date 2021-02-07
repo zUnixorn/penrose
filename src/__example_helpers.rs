@@ -16,8 +16,9 @@ pub use crate::{
         ring::{InsertPoint, Selector},
         screen::Screen,
         workspace::Workspace,
-        xconnection::{Result, XConn, XEvent, Xid},
+        xconnection::{ClientMessage, Prop, Result, XConn, XEvent, Xid},
     },
+    draw::Color,
     logging_error_handler, Backward, Forward, Less, More, PenroseError, WindowManager,
 };
 
@@ -197,6 +198,112 @@ __impl_stub_xcon! {
     conn: {
         fn mock_is_managed_client(&self, id: Xid) -> bool {
             !self.unmanaged_ids.contains(&id)
+        }
+    }
+}
+
+pub struct RecordingXConn(Cell<Vec<(String, Vec<String>)>>);
+pub type RecordedCall = (String, Vec<String>);
+
+
+impl fmt::Debug for RecordingXConn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecordingXConn").finish()
+    }
+}
+
+impl RecordingXConn {
+    pub fn init() -> Self {
+        Self(Cell::new(Vec::new()))
+    }
+
+    pub fn clear(&self) {
+        self.0.take();
+    }
+
+    pub fn calls(&self) -> Vec<(String, Vec<String>)> {
+        self.0.take()
+    }
+
+    fn add_call(&self, method: &str, args: Vec<String>) {
+        let mut inner = self.0.take();
+        inner.push((method.to_string(), args));
+        self.0.set(inner);
+    }
+}
+
+// TODO: add more recorded methods as they are needed
+__impl_stub_xcon! {
+    for RecordingXConn;
+
+    atom_queries: {
+        fn mock_atom_id(&self, name: &str) -> Result<Xid> {
+            self.add_call("atom_id", strings!(name));
+            Ok(0)
+        }
+    }
+    client_properties: {
+        fn mock_change_prop(&self, id: Xid, name: &str, val: Prop) -> Result<()> {
+            self.add_call("change_prop", strings!(id, name, val));
+            Ok(())
+        }
+
+        fn mock_delete_prop(&self, id: Xid, name: &str) -> Result<()> {
+            self.add_call("delete_prop", strings!(id, name));
+            Ok(())
+        }
+    }
+    client_handler: {
+        fn mock_focus_client(&self, id: Xid) -> Result<()> {
+            self.add_call("focus_client", strings!(id));
+            Ok(())
+        }
+
+        fn mock_map_client_if_needed(&self, win: Option<&mut Client>) -> Result<()> {
+            self.add_call("map_client_if_needed", strings!(win));
+            Ok(())
+        }
+
+        fn mock_unmap_client_if_needed(&self, win: Option<&mut Client>) -> Result<()> {
+            self.add_call("unmap_client_if_needed", strings!(win));
+            Ok(())
+        }
+    }
+    client_config: {
+        fn mock_set_client_border_color(&self, id: Xid, color: Color) -> Result<()> {
+            self.add_call("set_client_border_color", strings!(id, color));
+            Ok(())
+        }
+
+        fn mock_position_client(&self, id: Xid, r: Region, border: u32, stack_above: bool) -> Result<()> {
+            self.add_call("position_client", strings!(id, r, border, stack_above));
+            Ok(())
+        }
+
+        fn mock_raise_client(&self, id: Xid) -> Result<()> {
+            self.add_call("raise_client", strings!(id));
+            Ok(())
+        }
+    }
+    event_handler: {
+        fn mock_send_client_event(&self, msg: ClientMessage) -> Result<()> {
+            self.add_call("send_client_event", strings!(msg));
+            Ok(())
+        }
+    }
+    state: {
+        fn mock_current_screens(&self) -> Result<Vec<Screen>> {
+            self.add_call("current_screens", vec![]);
+            Ok(vec![
+                Screen::new(Region::new(0, 0, 1366, 768), 0),
+                Screen::new(Region::new(1366, 0, 1366, 768), 0),
+            ])
+        }
+    }
+    conn: {
+        fn mock_is_managed_client(&self, id: Xid) -> bool {
+            self.add_call("is_managed_client", strings!(id));
+            true
         }
     }
 }

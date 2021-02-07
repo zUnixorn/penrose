@@ -15,37 +15,11 @@ use crate::{
 
 use std::collections::HashMap;
 
-pub(super) struct ClientProps {
-    pub(super) name: String,
-    pub(super) class: String,
-    pub(super) ty: String,
-}
-
 pub(super) fn pad_region(region: &Region, gapless: bool, gap_px: u32, border_px: u32) -> Region {
     let gpx = if gapless { 0 } else { gap_px };
     let padding = 2 * (border_px + gpx);
     let (x, y, w, h) = region.values();
     Region::new(x + gpx, y + gpx, w - padding, h - padding)
-}
-
-pub(super) fn client_str_props<X>(conn: &X, id: Xid) -> ClientProps
-where
-    X: XClientProperties,
-{
-    ClientProps {
-        name: match conn.client_name(id) {
-            Ok(s) => s,
-            Err(_) => String::from("n/a"),
-        },
-        class: match conn.get_prop(id, Atom::WmClass.as_ref()) {
-            Ok(Prop::UTF8String(strs)) => strs[0].clone(),
-            _ => String::new(),
-        },
-        ty: match conn.get_prop(id, Atom::NetWmWindowType.as_ref()) {
-            Ok(Prop::UTF8String(strs)) => strs[0].clone(),
-            _ => String::new(),
-        },
-    }
 }
 
 pub(super) fn position_floating_client<X>(
@@ -218,23 +192,20 @@ where
     Ok(())
 }
 
-pub(super) fn parse_existing_client<X>(conn: &X, id: Xid) -> crate::Result<Client>
+pub(super) fn parse_existing_client<X>(
+    conn: &X,
+    id: Xid,
+    floating_classes: &[&str],
+) -> crate::Result<Client>
 where
     X: XClientProperties,
 {
-    let props = client_str_props(conn, id);
     let wix = match conn.get_prop(id, Atom::NetWmDesktop.as_ref()) {
         Ok(Prop::Cardinal(wix)) => wix,
         _ => 0,
     };
 
-    Ok(Client::new(
-        id,
-        props.name,
-        props.class,
-        wix as usize,
-        false,
-    ))
+    Ok(Client::new(conn, id, wix as usize, floating_classes))
 }
 
 #[cfg(test)]
@@ -375,7 +346,7 @@ mod tests {
             let mut client_map: HashMap<_, _> = (0..n_clients)
                 .map(|id| {
                     let id = id as u32;
-                    let mut client = Client::new(id, "name".into(), "class".into(), 0, false);
+                    let mut client = Client::new(&conn, id, 0, &[]);
                     client.mapped = true;
                     ws.add_client(id, &InsertPoint::Last).unwrap();
                     (id, client)

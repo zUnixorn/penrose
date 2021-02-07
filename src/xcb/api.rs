@@ -748,18 +748,13 @@ impl Api {
     /// Mark the given window as currently having focus in the X server state
     pub fn focus_client(&self, id: Xid) -> Result<()> {
         // xcb docs: https://www.mankier.com/3/xcb_set_input_focus
-        xcb::set_input_focus(
-            &self.conn,                    // xcb connection to X11
-            xcb::INPUT_FOCUS_PARENT as u8, // focus the parent when focus is lost
-            id,                            // window to focus
-            xcb::CURRENT_TIME,             // event time (0 == current time)
-        );
-
-        self.change_prop(
-            self.root(),
-            Atom::NetActiveWindow.as_ref(),
-            Prop::Window(vec![id]),
+        Ok(xcb::set_input_focus(
+            &self.conn,                          // xcb connection to X11
+            xcb::INPUT_FOCUS_POINTER_ROOT as u8, // focus the parent when focus is lost
+            id,                                  // window to focus
+            xcb::CURRENT_TIME,                   // event time (0 == current time)
         )
+        .request_check()?)
     }
 
     /// Send an event to a client
