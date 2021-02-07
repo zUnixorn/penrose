@@ -732,7 +732,12 @@ impl Api {
 
     /// Destroy the X server state for a given window
     pub fn destroy_client(&self, id: Xid) -> Result<()> {
-        Ok(xcb::destroy_window_checked(&self.conn, id).request_check()?)
+        xcb::grab_server(&self.conn);
+        xcb::set_close_down_mode(&self.conn, xcb::CLOSE_DOWN_DESTROY_ALL as u8);
+        let cookie = xcb::destroy_window_checked(&self.conn, id);
+        xcb::ungrab_server(&self.conn);
+        self.flush();
+        Ok(cookie.request_check()?)
     }
 
     /// Send a [XEvent::MapRequest] for the target window

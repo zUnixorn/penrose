@@ -642,10 +642,6 @@ impl<X: XConn> WindowManager<X> {
 
     // Map a new client window.
     fn handle_map_request(&mut self, id: Xid) -> Result<()> {
-        if !self.conn.is_managed_client(id) {
-            return Ok(self.conn.map_client(id)?);
-        }
-
         let classes = str_slice!(self.config.floating_classes);
         let mut client = Client::new(&self.conn, id, self.active_ws_index(), classes);
 
@@ -669,6 +665,11 @@ impl<X: XConn> WindowManager<X> {
         }
 
         self.client_map.insert(id, client);
+
+        if !self.conn.is_managed_client(id) {
+            return Ok(self.conn.map_client(id)?);
+        }
+
         self.conn.mark_new_client(id)?;
         self.update_x_known_clients()?;
 
@@ -1596,7 +1597,6 @@ impl<X: XConn> WindowManager<X> {
                 ClientMessageKind::DeleteWindow(id)
                     .as_message(&self.conn)
                     .and_then(|msg| self.conn.send_client_event(msg))
-                    .or(self.conn.destroy_client(id))
             } else {
                 self.conn.destroy_client(id)
             };
@@ -1604,9 +1604,6 @@ impl<X: XConn> WindowManager<X> {
             if let Err(e) = res {
                 error!("Error killing client: {}", e);
             }
-
-            self.remove_client(id)?;
-            self.conn.flush();
         }
 
         Ok(())
