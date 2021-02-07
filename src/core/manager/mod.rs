@@ -369,10 +369,7 @@ impl<X: XConn> WindowManager<X> {
                     self.conn.flush();
                 }
 
-                Err(e) => {
-                    self.exit()?;
-                    return Err(PenroseError::X(e));
-                }
+                Err(e) => (self.error_handler)(PenroseError::X(e)),
             }
         }
 

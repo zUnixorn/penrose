@@ -204,7 +204,9 @@ impl From<&ClientAttr> for Vec<(u32, u32)> {
         let root_event_mask = xcb::EVENT_MASK_PROPERTY_CHANGE
             | xcb::EVENT_MASK_SUBSTRUCTURE_REDIRECT
             | xcb::EVENT_MASK_SUBSTRUCTURE_NOTIFY
-            | xcb::EVENT_MASK_BUTTON_MOTION;
+            | xcb::EVENT_MASK_BUTTON_PRESS
+            | xcb::EVENT_MASK_BUTTON_MOTION
+            | xcb::EVENT_MASK_STRUCTURE_NOTIFY;
 
         match w {
             ClientAttr::BorderColor(c) => vec![(xcb::CW_BORDER_PIXEL, *c)],
