@@ -205,7 +205,6 @@ __impl_stub_xcon! {
 pub struct RecordingXConn(Cell<Vec<(String, Vec<String>)>>);
 pub type RecordedCall = (String, Vec<String>);
 
-
 impl fmt::Debug for RecordingXConn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RecordingXConn").finish()

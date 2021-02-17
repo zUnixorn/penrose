@@ -9,7 +9,7 @@ use crate::{
         ring::{Direction, InsertPoint, Ring, Selector},
         screen::Screen,
         workspace::Workspace,
-        xconnection::{Atom, ClientMessageKind, Prop, XConn, Xid},
+        xconnection::{Atom, ClientMessageKind, Prop, WindowState, XConn, Xid},
     },
     ErrorHandler, PenroseError, Result,
 };
@@ -298,6 +298,7 @@ impl<X: XConn> WindowManager<X> {
                 run_hooks!(randr_notify, self,);
                 self.detect_screens()?
             }
+            EventAction::FocusIn(id) => self.focus_in(id)?,
             EventAction::MapWindow(id) => self.handle_map_request(id)?,
             EventAction::MoveClientIfFloating(id, r) => self.handle_move_if_floating(id, r)?,
             EventAction::RunKeyBinding(k) => self.run_key_binding(k, key_bindings),
@@ -311,6 +312,7 @@ impl<X: XConn> WindowManager<X> {
             EventAction::UnknownPropertyChange(id, atom, is_root) => {
                 self.handle_prop_change(id, atom, is_root)?;
             }
+            EventAction::Unmap(id) => self.handle_unmap_notify(id)?,
         }
         Ok(())
     }
@@ -445,6 +447,10 @@ impl<X: XConn> WindowManager<X> {
             let msg = ClientMessageKind::TakeFocus(id).as_message(&self.conn)?;
             self.conn.send_client_event(msg)?
         })
+    }
+
+    fn focus_in(&self, id: Xid) -> Result<()> {
+        self.set_focus(id, self.conn.client_accepts_focus(id))
     }
 
     // Set the current focus point based on client focus hints
@@ -680,7 +686,12 @@ impl<X: XConn> WindowManager<X> {
             self.conn.warp_cursor(Some(id), s)?;
         }
 
+        self.conn.set_client_state(id, WindowState::Normal)?;
         Ok(())
+    }
+
+    fn handle_unmap_notify(&mut self, id: Xid) -> Result<()> {
+        Ok(self.conn.set_client_state(id, WindowState::Withdrawn)?)
     }
 
     fn handle_move_if_floating(&mut self, id: Xid, r: Region) -> Result<()> {

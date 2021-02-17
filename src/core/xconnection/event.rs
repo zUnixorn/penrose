@@ -25,6 +25,8 @@ pub enum XEvent {
     Enter(PointerChange),
     /// A part or all of a client has become visible
     Expose(ExposeEvent),
+    /// A client should have focus
+    FocusIn(Xid),
     /// A client window has been closed
     Destroy(Xid),
     /// A grabbed key combination has been entered by the user
@@ -32,6 +34,8 @@ pub enum XEvent {
     /// The mouse pointer has left the current client window
     Leave(PointerChange),
     /// A client window is requesting to be positioned and rendered on the screen.
+    ///
+    /// The boolean represents whether or not this client has overrideredirect set or not
     MapRequest(Xid, bool),
     /// The mouse has moved or a mouse button has been pressed
     MouseEvent(MouseEvent),
@@ -41,6 +45,8 @@ pub enum XEvent {
     RandrNotify,
     /// Focus has moved to a different screen
     ScreenChange,
+    /// A window is being unmapped
+    UnmapNotify(Xid),
 }
 
 /// Known common client message formats.

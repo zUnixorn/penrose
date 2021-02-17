@@ -41,6 +41,8 @@ pub enum EventAction {
     DestroyClient(Xid),
     /// Screens should be redetected
     DetectScreens,
+    /// FocusIn event for a client
+    FocusIn(Xid),
     /// A new X window needs to be mapped
     MapWindow(Xid),
     /// A client is requesting to be moved: honoured if the client is floating
@@ -59,6 +61,8 @@ pub enum EventAction {
     ToggleClientFullScreen(Xid, bool),
     /// An unknown property was changed on an X window
     UnknownPropertyChange(Xid, String, bool),
+    /// A window is becoming unmapped
+    Unmap(Xid),
 }
 
 pub(super) fn process_next_event<X>(event: XEvent, state: WmState<'_, X>) -> Vec<EventAction>
@@ -69,6 +73,7 @@ where
         // Direct 1-n mappings of XEvents -> EventActions
         XEvent::Destroy(id) => vec![EventAction::DestroyClient(id)],
         XEvent::Expose(_) => vec![], // FIXME: work out if this needs handling in the WindowManager
+        XEvent::FocusIn(id) => vec![EventAction::FocusIn(id)],
         XEvent::KeyPress(code) => vec![EventAction::RunKeyBinding(code)],
         XEvent::Leave(p) => vec![
             EventAction::ClientFocusLost(p.id),
@@ -77,6 +82,7 @@ where
         XEvent::MouseEvent(evt) => vec![EventAction::RunMouseBinding(evt)],
         XEvent::RandrNotify => vec![EventAction::DetectScreens],
         XEvent::ScreenChange => vec![EventAction::SetScreenFromPoint(None)],
+        XEvent::UnmapNotify(id) => vec![EventAction::Unmap(id)],
 
         // Require processing based on current WindowManager state
         XEvent::ClientMessage(msg) => process_client_message(state, msg),
@@ -172,10 +178,13 @@ fn process_property_notify(evt: PropertyEvent) -> Vec<EventAction> {
         Ok(a) if a == Atom::WmName || a == Atom::NetWmName => {
             vec![EventAction::ClientNameChanged(evt.id, evt.is_root)]
         }
-        _ => vec![EventAction::UnknownPropertyChange(
-            evt.id,
-            evt.atom,
-            evt.is_root,
-        )],
+
+        // TODO: handle other property changes such as hints, wintype changes and transients
+        _ => vec![],
+        // _ => vec![EventAction::UnknownPropertyChange(
+        //     evt.id,
+        //     evt.atom,
+        //     evt.is_root,
+        // )],
     }
 }

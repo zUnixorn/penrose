@@ -119,12 +119,27 @@ pub enum ClientAttr {
 }
 
 /// An [XEvent] parsed into a [KeyPress] if possible, otherwise the original `XEvent`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyPressParseAttempt {
     /// The event was parasble as a [KeyPress]
     KeyPress(KeyPress),
     /// The event was not a [KeyPress]
     XEvent(XEvent),
+}
+
+/// Possible valid values for setting the `WM_STATE` property on a client.
+///
+/// See the [ICCCM docs][1] for more information.
+///
+/// [1]: https://tronche.com/gui/x/icccm/sec-4.html#s-4.1.3.1
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub enum WindowState {
+    /// This window has been hidden
+    Withdrawn,
+    /// The client should be animating its window
+    Normal,
+    /// The client should animate its icon window
+    Iconic,
 }
 
 /// Convert between string representations of X atoms and their IDs
@@ -263,6 +278,14 @@ pub trait XClientProperties {
     #[stub(Ok(()))]
     fn change_prop(&self, id: Xid, name: &str, val: Prop) -> Result<()>;
 
+    /// Update a client's `WM_STATE` property to the given value.
+    ///
+    /// See the [ICCCM docs][1] for more information on what each value means for the client.
+    ///
+    /// [1]: https://tronche.com/gui/x/icccm/sec-4.html#s-4.1.3.1
+    #[stub(Ok(()))]
+    fn set_client_state(&self, id: Xid, wm_state: WindowState) -> Result<()>;
+
     /*
      *  The following default implementations should used if possible.
      *
@@ -277,6 +300,14 @@ pub trait XClientProperties {
             Ok(p) => Err(XError::Raw(format!("Expected atoms, got {:?}", p))),
             Err(XError::MissingProperty(_, _)) => Ok(false),
             Err(e) => Err(e),
+        }
+    }
+
+    /// Check to see if a given client accepts input focus
+    fn client_accepts_focus(&self, id: Xid) -> bool {
+        match self.get_prop(id, Atom::WmHints.as_ref()) {
+            Ok(Prop::WmHints(WmHints { accepts_input, .. })) => accepts_input,
+            _ => true,
         }
     }
 
@@ -539,7 +570,7 @@ pub trait XConn:
     /// Check to see if this client is one that we should be handling or not
     fn is_managed_client(&self, id: Xid) -> bool {
         if self.get_prop(id, Atom::WmTransientFor.as_ref()).is_ok() {
-            false
+            true
         } else if let Ok(Prop::Atom(atoms)) = self.get_prop(id, Atom::NetWmWindowType.as_ref()) {
             atoms.iter().any(|atom| match Atom::from_str(atom) {
                 Ok(a) => !UNMANAGED_WINDOW_TYPES.contains(&a),

@@ -7,7 +7,7 @@ use crate::{
         screen::Screen,
         xconnection::{
             Atom, ClientAttr, ClientConfig, ClientEventMask, ClientMessage, ClientMessageKind,
-            ConfigureEvent, ExposeEvent, PointerChange, Prop, PropertyEvent, WmHints,
+            ConfigureEvent, ExposeEvent, PointerChange, Prop, PropertyEvent, WindowState, WmHints,
             WmNormalHints, XAtomQuerier, XEvent, Xid, UNMANAGED_WINDOW_TYPES,
         },
     },
@@ -27,6 +27,17 @@ pub type ReverseCodeMap = HashMap<(KeyCodeMask, KeyCodeValue), String>;
 
 const RANDR_MAJ: u32 = 1;
 const RANDR_MIN: u32 = 2;
+
+// XCB error codes
+// const BAD_REQUEST: u8 = 1;
+// const BAD_VALUE: u8 = 2;
+const BAD_WINDOW: u8 = 3;
+// const BAD_ATOM: u8 = 5;
+// const BAD_MATCH: u8 = 8;
+
+macro_rules! is_err {
+    { $e:expr, $code:expr } => { $e.error_code() == $code }
+}
 
 #[cfg(feature = "serde")]
 fn default_conn() -> xcb::Connection {
@@ -433,6 +444,11 @@ impl Api {
                 }))
             }
 
+            xcb::FOCUS_IN => {
+                let e: &xcb::FocusInEvent = unsafe { xcb::cast_event(&event) };
+                Some(XEvent::FocusIn(e.event()))
+            }
+
             xcb::LEAVE_NOTIFY => {
                 let e: &xcb::LeaveNotifyEvent = unsafe { xcb::cast_event(&event) };
                 Some(XEvent::Leave(PointerChange {
@@ -528,6 +544,11 @@ impl Api {
                     })
             }
 
+            xcb::UNMAP_NOTIFY => {
+                let e: &xcb::UnmapNotifyEvent = unsafe { xcb::cast_event(&event) };
+                Some(XEvent::UnmapNotify(e.window()))
+            }
+
             0 => {
                 // ...why is this what you have to do to get at an error?
                 let e: &xcb::GenericError = unsafe { xcb::cast_event(&event) };
@@ -583,6 +604,24 @@ impl Api {
     /// Delete a known property from a window
     pub fn delete_prop(&self, id: Xid, prop: &str) -> Result<()> {
         Ok(xcb::delete_property_checked(&self.conn, id, self.atom(prop)?).request_check()?)
+    }
+
+    /// Set the target client's WM_STATE
+    pub fn set_client_state(&self, id: Xid, wm_state: WindowState) -> Result<()> {
+        let mode = xcb::PROP_MODE_REPLACE as u8;
+        let a = self.known_atom(Atom::WmState);
+        let state = match wm_state {
+            WindowState::Withdrawn => 0,
+            WindowState::Normal => 1,
+            WindowState::Iconic => 3,
+        };
+
+        let cookie = xcb::change_property_checked(&self.conn, mode, id, a, a, 32, &[state]);
+        Ok(match cookie.request_check() {
+            // The window is already gone
+            Err(e) if is_err!(e, BAD_WINDOW) => (),
+            other => other?,
+        })
     }
 
     /// Replace a property value on a window.

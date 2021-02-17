@@ -1,7 +1,7 @@
 //! Metadata around X clients and manipulating them
 use crate::core::{
     data_types::Region,
-    xconnection::{Atom, Prop, WmHints, XClientProperties, Xid},
+    xconnection::{Atom, Prop, XClientProperties, Xid},
 };
 
 /**
@@ -33,10 +33,7 @@ impl Client {
     where
         X: XClientProperties,
     {
-        let accepts_focus = match conn.get_prop(id, Atom::WmHints.as_ref()) {
-            Ok(Prop::WmHints(WmHints { accepts_input, .. })) => accepts_input,
-            _ => true,
-        };
+        let accepts_focus = conn.client_accepts_focus(id);
 
         let geom = match conn.get_prop(id, Atom::WmNormalHints.as_ref()) {
             Ok(Prop::WmNormalHints(nh)) => nh.requested_position(),
